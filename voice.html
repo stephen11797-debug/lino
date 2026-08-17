@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Voice Assistant</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;color:#fff;font-family:system-ui,sans-serif;padding:12px;min-height:100vh}
+.container{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.header{background:#111;border:1px solid #2a2a4a;border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+.header h1{color:#00ff88;font-size:18px}
+.header .net{font-size:10px;color:#888}
+.chat{flex:1;background:#111;border:1px solid #2a2a4a;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:280px;max-height:52vh;overflow-y:auto}
+.msg{padding:10px 14px;border-radius:12px;font-size:14px;line-height:1.5;max-width:85%;word-break:break-word}
+.msg.user{align-self:flex-end;background:#4f46e5}
+.msg.ai{align-self:flex-start;background:#1a1a2e;border:1px solid #2a2a4a}
+.msg.hint{background:transparent;color:#666;font-size:11px;text-align:center;align-self:center}
+.controls{display:flex;gap:8px;align-items:center}
+.mic-btn{flex:1;background:#00ff88;color:#000;border:none;border-radius:50px;padding:18px;font-size:16px;font-weight:bold;cursor:pointer;min-height:60px;transition:transform .1s}
+.mic-btn.listening{background:#ff4444;color:#fff;animation:pulse 1s infinite}
+.mic-btn:active{transform:scale(.95)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.btn{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;color:#fff;padding:14px;font-size:14px;cursor:pointer;min-height:50px;text-align:center}
+.btn:hover{background:#2a2a4a}
+.voice-row{display:flex;gap:8px;align-items:center;font-size:11px;color:#888;flex-wrap:wrap}
+.voice-row select{background:#0a0a20;border:1px solid #2a2a4a;border-radius:8px;color:#fff;padding:8px;font-size:12px;flex:1;min-width:140px}
+.voice-row label{display:flex;align-items:center;gap:6px;font-size:11px}
+.voice-row input[type="range"]{width:80px;appearance:none;height:4px;background:#1a1a2e;border-radius:2px}
+.voice-row input[type="range"]::-webkit-slider-thumb{appearance:none;width:14px;height:14px;background:#00ff88;border-radius:50%;cursor:pointer}
+.status{font-size:11px;color:#888;text-align:center;min-height:16px}
+.wave{height:24px;display:flex;align-items:center;gap:3px;justify-content:center}
+.wave span{width:4px;background:#00ff88;border-radius:2px;height:4px;transition:height .08s}
+.wave.listening span{animation:eq 0.7s infinite ease-in-out}
+.wave span:nth-child(2){animation-delay:.1s}.wave span:nth-child(3){animation-delay:.2s}
+.wave span:nth-child(4){animation-delay:.3s}.wave span:nth-child(5){animation-delay:.4s}
+@keyframes eq{0%,100%{height:4px}50%{height:24px}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+<h1>🗣️ Voice Assistant</h1>
+<div style="text-align:right;font-size:10px;color:#888">
+<span class="net" id="netStatus">● offline ready</span><br>
+<span id="remoteStatus" style="color:#888">Remote: off</span>
+</div>
+</div>
+
+<div class="voice-row" style="margin-bottom:4px">
+<input type="text" id="deviceName" placeholder="Your name (e.g. Stephen)" style="flex:1;background:#0a0a20;border:1px solid #2a2a4a;border-radius:8px;color:#fff;padding:8px;font-size:12px">
+<button class="btn" onclick="setDeviceName()" style="padding:8px 12px;min-height:auto">Save</button>
+</div>
+<div class="voice-row">
+<input type="text" id="serverUrl" placeholder="Remote server URL (e.g. http://192.168.1.5:8000)" style="flex:1;background:#0a0a20;border:1px solid #2a2a4a;border-radius:8px;color:#fff;padding:8px;font-size:12px">
+<button class="btn" onclick="connectRemote()" style="padding:8px 12px;min-height:auto">Connect</button>
+<button class="btn" onclick="disconnectRemote()" style="padding:8px 12px;min-height:auto">Disconnect</button>
+</div>
+
+<div class="chat" id="chat">
+<div class="msg hint">Tap the green mic and speak. Replies are spoken back in a natural voice.</div>
+</div>
+
+<div class="status" id="status"></div>
+<div class="wave" id="wave"><span></span><span></span><span></span><span></span><span></span></div>
+
+<div class="controls">
+<button class="mic-btn" id="micBtn" onclick="toggleListen()">🎙️ TAP & SPEAK</button>
+</div>
+
+<div class="controls-row" style="display:flex;gap:8px;flex-wrap:wrap">
+<button class="btn" onclick="speakNow()" style="flex:1">🔊 Speak</button>
+<button class="btn" onclick="clearChat()" style="flex:1">🗑️ Clear</button>
+</div>
+
+<div class="voice-row">
+<select id="voiceSelect" onchange="setVoice()"></select>
+</div>
+<div class="voice-row">
+<label>Rate <input type="range" id="rate" min="0.5" max="1.5" step="0.1" value="0.95"></label>
+<label>Pitch <input type="range" id="pitch" min="0.5" max="1.5" step="0.1" value="1.0"></label>
+</div>
+
+</div>
+
+<script>
+const chat = document.getElementById('chat');
+const status = document.getElementById('status');
+const wave = document.getElementById('wave');
+const micBtn = document.getElementById('micBtn');
+
+let voices = [];
+let listening = false;
+let online = navigator.onLine;
+
+function setNet() {
+    online = navigator.onLine;
+    document.getElementById('netStatus').textContent = online ? '● online' : '○ offline (speech may not work)';
+    document.getElementById('netStatus').style.color = online ? '#00ff88' : '#888';
+}
+window.addEventListener('online', setNet);
+window.addEventListener('offline', setNet);
+setNet();
+
+function addMsg(cls, text) {
+    const d = document.createElement('div');
+    d.className = 'msg ' + cls;
+    d.textContent = text;
+    chat.appendChild(d);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function showStableText(t) {
+    let last = chat.querySelector('.msg.user:last-child');
+    if (!last) addMsg('user', t);
+    else last.textContent = t;
+    chat.scrollTop = chat.scrollHeight;
+}
+
+// ---- Text-to-Speech (works offline with local voices, no internet needed) ----
+function loadVoices() {
+    voices = speechSynthesis.getVoices();
+    const sel = document.getElementById('voiceSelect');
+    sel.innerHTML = '';
+    voices.forEach((v, i) => {
+        const o = document.createElement('option');
+        o.value = i;
+        o.textContent = v.name + ' (' + v.lang + ')';
+        sel.appendChild(o);
+    });
+    // prefer a natural/neural voice
+    const preferred = voices.find(v => /natural|neural|enhanced|google/i.test(v.name));
+    if (preferred) {
+        sel.value = voices.indexOf(preferred);
+    }
+}
+function initSpeak() {
+    if (!('speechSynthesis' in window)) { status.textContent = '❌ Speech output not supported.'; return; }
+    loadVoices();
+    speechSynthesis.onvoiceschanged = loadVoices;
+}
+function pickVoice() {
+    const idx = parseInt(document.getElementById('voiceSelect').value);
+    const list = speechSynthesis.getVoices();
+    return list[idx] || null;
+}
+function speakNow() {
+    const last = chat.querySelector('.msg:last-of-type');
+    const txt = last && last.classList.contains('user') ? last.textContent.replace(/^You: /, '') : 'Hello, I am listening. Tap the microphone and speak.';
+    say(txt);
+}
+function say(text) {
+    if (!('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(text);
+    const v = pickVoice();
+    if (v) u.voice = v;
+    u.rate = parseFloat(document.getElementById('rate').value);
+    u.pitch = parseFloat(document.getElementById('pitch').value);
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+    status.textContent = '🔊 Speaking...';
+    u.onend = () => status.textContent = '';
+}
+// ---- Voice recognition (uses browser service; falls back gracefully offline) ----
+function getRecognition() {
+    const S = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!S) return null;
+    const r = new S();
+    r.lang = 'en-US';
+    r.interimResults = true;
+    r.continuous = false;
+    r.maxAlternatives = 1;
+    return r;
+}
+
+function toggleListen() {
+    if (listening) { stopListen(); return; }
+    const r = getRecognition();
+    if (!r) { status.textContent = '❌ Speech recognition not supported in this browser.'; return; }
+    if (!online) { status.textContent = '⚠️ Offline — recognition needs the web. Speak button still works.'; return; }
+    listening = true;
+    micBtn.textContent = '⏹ STOP';
+    micBtn.classList.add('listening');
+    setWave(true);
+    status.textContent = '🎤 Listening…';
+
+    let finalText = '';
+
+    r.onresult = (e) => {
+        let interim = '';
+        for (let i = 0; i < e.results.length; i++) {
+            if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+            else interim += e.results[i][0].transcript;
+        }
+        showStableText(finalText || interim);
+    };
+
+    r.onend = () => {
+        setListening(false);
+        finalText = finalText.trim();
+        if (!finalText) { status.textContent = 'Nothing heard. Try again.'; return; }
+        postRemote('user', finalText);
+        const reply = respond(finalText);
+        addMsg('ai', reply);
+        postRemote('ai', reply);
+        say(reply);
+    };
+
+    r.onerror = (e) => {
+        if (e.error === 'aborted') return;
+        setListening(false);
+        status.textContent = '❌ Error: ' + e.error;
+    };
+
+    r.start();
+}
+
+function stopListen() {
+    if (window._rec) { window._rec.stop(); window._rec = null; }
+}
+
+function showStableText(t) {
+    let last = chat.querySelector('.msg.user:last-child');
+    if (!last) addMsg('user', t);
+    else last.textContent = t;
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function respond(text) {
+    const t = text.toLowerCase();
+    if (/hello|hi|hey/.test(t)) return 'Hello! How can I help you today?';
+    if (/how are you/.test(t)) return "I'm doing great, thank you for asking!";
+    if (/your name/.test(t)) return "I'm your voice assistant.";
+    if (/time/.test(t)) return 'I can tell you the time: ' + new Date().toLocaleTimeString();
+    if (/date|day/.test(t)) return 'Today is ' + new Date().toLocaleDateString();
+    if (/open google|search/.test(t)) {
+        const q = t.replace(/search for|open google|google/, '').trim();
+        if (q) window.open('https://www.google.com/search?q=' + encodeURIComponent(q), '_blank');
+        return 'Opening Google for: ' + q;
+    }
+    return 'You said: "' + text + '". Try asking me the time or date, or say "search for something".';
+}
+
+function setListening(on) {
+    listening = on;
+    micBtn.textContent = on ? '⏹ STOP' : '🎤 TAP & SPEAK';
+    micBtn.classList.toggle('listening', on);
+    setWave(on);
+    if (!on) status.textContent = '';
+}
+
+function clearChat() {
+    chat.innerHTML = '<div class="msg hint">Tap the green mic and speak.</div>';
+}
+
+// ============================================================
+// REMOTE SYNC (share conversation across devices)
+// ============================================================
+let remoteUrl = null;
+let pollTimer = null;
+let remoteRev = 0;
+let remoteClientId = null;
+
+function setWave(on) { wave.classList.toggle('listening', on); }
+
+function setDeviceName() {
+    const n = document.getElementById('deviceName').value.trim();
+    if (n) localStorage.setItem('voiceName', n);
+    status.textContent = n ? '👤 Name set: ' + n : '';
+}
+
+function connectRemote() {
+    let url = document.getElementById('serverUrl').value.trim();
+    if (!url) url = 'http://localhost:8000';   // same-machine default
+    if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+    url = url.replace(/\/+$/, '');
+    if (!remoteClientId) remoteClientId = 'd' + Date.now();
+    remoteUrl = url;
+    document.getElementById('remoteStatus').textContent = 'Remote: connecting…';
+    document.getElementById('remoteStatus').style.color = '#eab308';
+    if (pollTimer) clearTimeout(pollTimer);
+    pollLoop();
+}
+
+function disconnectRemote() {
+    remoteUrl = null;
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = null;
+    document.getElementById('remoteStatus').textContent = 'Remote: off';
+    document.getElementById('remoteStatus').style.color = '#888';
+}
+
+function isRemote() { return !!remoteUrl; }
+
+function postRemote(type, text) {
+    if (!remoteUrl) return;
+    const name = document.getElementById('deviceName').value.trim() || 'device';
+    fetch(remoteUrl + '/api/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: type, text: text, name: name, client: remoteClientId })
+    }).catch(() => {});
+}
+
+function renderRemote(msg) {
+    const who = msg.name && msg.name !== 'device' ? msg.name : (msg.type === 'ai' ? 'Assistant' : 'Remote');
+    const d = document.createElement('div');
+    d.className = 'msg ' + (msg.type === 'ai' ? 'ai' : 'user');
+    d.textContent = (msg.type === 'ai' ? '🤖 ' : '📱 ' + who + ': ') + msg.text;
+    chat.appendChild(d);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function pollLoop() {
+    if (!remoteUrl) return;
+    fetch(remoteUrl + '/api/poll?since=' + remoteRev)
+        .then(r => r.json())
+        .then(data => {
+            if (data && Array.isArray(data.messages)) {
+                data.messages.forEach(m => {
+                    if (m.client && m.client === remoteClientId) return; // own echo
+                    renderRemote(m);
+                });
+                remoteRev = data.rev;
+            }
+            document.getElementById('remoteStatus').textContent = 'Remote: connected';
+            document.getElementById('remoteStatus').style.color = '#00ff88';
+        })
+        .catch(() => {
+            document.getElementById('remoteStatus').textContent = 'Remote: unreachable';
+            document.getElementById('remoteStatus').style.color = '#ff4444';
+        })
+        .then(() => { pollTimer = setTimeout(pollLoop, 1500); });
+}
+
+init();
+function init() {
+    initSpeak();
+    const saved = localStorage.getItem('voiceName');
+    if (saved) { document.getElementById('deviceName').value = saved; }
+}
+</script>
+</body>
+</html>

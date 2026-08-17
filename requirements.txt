@@ -1,0 +1,16 @@
+# Lino Voice Assistant - Python dependencies
+#
+# System-level dependencies (install via apt):
+#   sudo apt install python3-gi python3-cairo gir1.2-gtk-3.0 \
+#                     gir1.2-gdkpixbuf-2.0 gir1.2-pango-1.0 \
+#                     libcairo2 libxtst6 wmctrl x11-utils \
+#                     pulseaudio alsa-utils
+#
+# Speech-to-text (offline):
+vosk==0.3.45
+
+# Text-to-speech (offline neural voices):
+piper-tts==1.6.1
+
+# Optional: RGB control (only needed by oc_control.py):
+openrgb-python==0.3.6

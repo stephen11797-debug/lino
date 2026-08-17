@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# OS files
+.DS_Store
+Thumbs.db
+.AppleDouble
+.LSOverride
+
+# Large binary / generated files
+*.wav
+*.zip
+*.tar*
+*.onnx
+
+# Vosk speech model (downloaded separately, ~40MB+)
+model/
+model_small_backup/
+
+# Build artifacts
+*.deb
+lintian*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local files
+*.log
+.vs/
+.vm/
+speak.wav
+capture.wav
