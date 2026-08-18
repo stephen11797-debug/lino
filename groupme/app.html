@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GroupMe for Linux</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  :root{
+    --accent:#5b7cfa; --accent-soft:rgba(91,124,250,.12);
+    --text:#1a1a1a; --text2:#5a5a5a;
+    --glass:rgba(255,255,255,.72); --glass2:rgba(255,255,255,.55);
+    --border:rgba(0,0,0,.08); --shadow:0 8px 28px rgba(0,0,0,.18);
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-user-select:none; user-select:none;}
+  body{
+    font-family:"Segoe UI","Segoe UI Variable","Cantarell",system-ui,-apple-system,sans-serif;
+    background:#f2f2f4; color:var(--text); height:100vh; overflow:hidden;
+  }
+  .titlebar{height:40px; display:flex; align-items:center; gap:12px; padding:0 8px;
+    background:rgba(255,255,255,.55); backdrop-filter:blur(30px) saturate(1.4);
+    border-bottom:1px solid var(--border); position:relative; z-index:60;}
+  .logo{width:18px;height:18px;border-radius:5px;margin-left:6px;
+    background:linear-gradient(135deg,#5b7cfa,#9333ea);}
+  .tname{font-weight:600; font-size:13px;}
+  .winbtn{width:46px;height:32px;border:none;background:transparent;color:var(--text);
+    font-size:11px;border-radius:4px; cursor:pointer;}
+  .winbtn:hover{background:rgba(0,0,0,.06);}
+  .winbtn.close:hover{background:#e81123;color:#fff;}
+  .spacer{flex:1;}
+  .app{display:flex; height:calc(100vh - 40px);}
+  /* sidebar */
+  .sidebar{width:280px; border-right:1px solid var(--border); display:flex; flex-direction:column;
+    background:var(--glass); backdrop-filter:blur(24px);}
+  .side-head{padding:16px 16px 8px; font-weight:600; font-size:15px;}
+  .side-actions{padding:0 16px 12px; display:flex; gap:6px;}
+  .side-actions input{flex:1; border:1px solid var(--border); border-radius:8px; padding:8px; font-size:13px; outline:none; font-family:inherit;}
+  .side-actions button{background:var(--accent); color:#fff; border:none; border-radius:8px; padding:0 12px; cursor:pointer; font-size:13px;}
+  .group-row{display:flex; align-items:center; gap:12px; padding:11px 16px; cursor:pointer; border-bottom:1px solid var(--border);}
+  .group-row:hover{background:var(--accent-soft);}
+  .group-row.active{background:var(--accent-soft); border-left:3px solid var(--accent);}
+  .gicon{width:40px;height:40px;border-radius:10px; background:linear-gradient(135deg,#5b7cfa,#9333ea); color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;}
+  .group-row .gname{font-weight:500; font-size:14px;}
+  .group-row .gmeta{font-size:12px; color:var(--text2);}
+  .grp-list{flex:1; overflow-y:auto;}
+  /* chat panel */
+  .chat{flex:1; display:flex; flex-direction:column; background:var(--glass2); backdrop-filter:blur(24px);}
+  .chat-head{display:flex; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid var(--border);
+    background:rgba(255,255,255,.6);}
+  .chat-head .ttl{font-weight:600; font-size:15px;}
+  .chat-head .sub{font-size:12px; color:var(--text2);}
+  .callbtn{margin-left:auto; background:var(--accent); color:#fff; border:none; border-radius:10px;
+    padding:8px 16px; font-size:13px; cursor:pointer;}
+  .callbtn.joining{background:#7c3aed;}
+  .callbtn.live{background:#16a34a; animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(22,163,74,.5);}50%{box-shadow:0 0 0 8px rgba(22,163,74,0);}}
+  .msgs{flex:1; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:10px;}
+  .m{max-width:70%; align-self:flex-start;}
+  .m.mine{align-self:flex-end;}
+  .m.system{align-self:center; max-width:90%; font-size:12px; color:var(--text2); text-align:center;}
+  .m .who{font-size:11px; color:var(--text2); margin-bottom:2px;}
+  .m .body{background:#e9e9ec; border-radius:14px; border-bottom-left-radius:5px; padding:9px 13px; font-size:14px; word-break:break-word;}
+  .m.mine .body{background:var(--accent); color:#fff; border-radius:14px; border-bottom-right-radius:5px;}
+  .m .body img{max-width:240px; border-radius:8px; display:block;}
+  .m .body audio{width:230px; height:36px; display:block;}
+  .m .time{font-size:10px; color:var(--text2); margin-top:3px;}
+  .m.mine .time{text-align:right;}
+  .inputbar{display:flex; gap:8px; padding:12px 18px; border-top:1px solid var(--border); background:rgba(255,255,255,.6); align-items:center;}
+  #textIn{flex:1; border:1px solid var(--border); border-radius:10px; padding:10px 12px; font-size:14px; outline:none; font-family:inherit;}
+  .ibtn{width:42px;height:42px;border-radius:12px;border:1px solid var(--border);background:#fff;font-size:18px;cursor:pointer;}
+  .ibtn:active{transform:scale(.92);}
+  .ibtn.rec{background:#ef4444;color:#fff;border-color:#ef4444;animation:pulse 1s infinite;}
+  .rec-ind{display:none; align-items:center; gap:6px; color:#ef4444; font-size:12px; font-weight:600; padding:0 4px;}
+  .rec-ind.show{display:flex;}
+  .rec-dot{width:10px;height:10px;border-radius:50%;background:#ef4444;animation:blink 1s infinite;}
+  @keyframes blink{50%{opacity:.2;}}
+  /* call overlay */
+  #callOverlay{position:fixed; inset:0; z-index:200; display:none; flex-direction:column;
+    background:linear-gradient(160deg,#101425,#1b1030); color:#fff;}
+  #callOverlay.active{display:flex;}
+  .call-top{display:flex; align-items:center; gap:12px; padding:18px 24px;}
+  .call-top .t{font-weight:600; font-size:16px;}
+  .call-top .dur{font-size:12px; opacity:.7;}
+  .call-videos{flex:1; display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:0 24px; overflow:hidden;}
+  .vwrap{position:relative; border-radius:16px; overflow:hidden; background:#000;}
+  .vwrap video{width:100%; height:100%; object-fit:cover;}
+  .vwrap .tag{position:absolute; top:10px; left:12px; background:rgba(0,0,0,.45); padding:4px 10px; border-radius:20px; font-size:12px;}
+  .call-controls{display:flex; justify-content:center; gap:18px; padding:22px;}
+  .ccbtn{width:56px;height:56px;border-radius:50%;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:22px;cursor:pointer;}
+  .ccbtn.off{background:#eab308;color:#111;}
+  .ccbtn.hangup{background:#ef4444; width:64px;height:64px;}
+  .ccbtn:hover{filter:brightness(1.15);}
+  /* login */
+  #login{position:fixed; inset:0; z-index:300; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(135deg,#eef2ff 0%,#faf5ff 100%);}
+  .login-card{width:340px; background:var(--glass); backdrop-filter:blur(30px); border:1px solid var(--border);
+    border-radius:18px; padding:28px; box-shadow:var(--shadow); text-align:center;}
+  .login-logo{width:56px;height:56px;border-radius:14px;margin:0 auto 12px;
+    background:linear-gradient(135deg,#5b7cfa,#9333ea);}
+  .login-card h1{font-size:22px; margin-bottom:4px;}
+  .login-card p{font-size:13px; color:var(--text2); margin-bottom:18px;}
+  #loginName{width:100%; border:1px solid var(--border); border-radius:10px; padding:11px 12px; font-size:14px; outline:none; margin-bottom:10px; font-family:inherit;}
+  #loginBtn{width:100%; background:var(--accent); color:#fff; border:none; border-radius:10px; padding:11px; font-size:14px; cursor:pointer;}
+  .toast{position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:rgba(30,30,30,.92); color:#fff;
+    padding:10px 18px; border-radius:10px; font-size:13px; z-index:400; opacity:0; transition:opacity .25s; pointer-events:none;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="logo"></div>
+  <span class="tname">GroupMe for Linux</span>
+  <span id="whoami" style="font-size:12px;color:var(--text2)"></span>
+  <div class="spacer"></div>
+  <button class="winbtn">&#xE921;</button>
+  <button class="winbtn">&#xE922;</button>
+  <button class="winbtn close">&#xE8BB;</button>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="side-head">&#x1F465; Your Groups</div>
+    <div class="side-actions">
+      <input id="grpName" placeholder="Create group...">
+      <button onclick="createGroup()">+</button>
+    </div>
+    <div class="side-actions">
+      <input id="grpJoinId" placeholder="Join by code...">
+      <button onclick="joinGroup()">Join</button>
+    </div>
+    <div class="grp-list" id="grpList"></div>
+  </div>
+
+  <div class="chat">
+    <div class="chat-head" id="chatHead" style="display:none">
+      <div class="gicon" id="gIcon">G</div>
+      <div>
+        <div class="ttl" id="gTitle">Group</div>
+        <div class="sub" id="gSub">0 members</div>
+      </div>
+      <button class="callbtn" id="callBtn" onclick="callAction()">Start call</button>
+    </div>
+    <div class="msgs" id="msgs">
+      <div style="margin:auto;color:var(--text2);font-size:14px;">Select or create a group to start chatting</div>
+    </div>
+    <div class="rec-ind" id="recInd"><span class="rec-dot"></span> Recording voice... tap the mic to stop</div>
+    <div class="inputbar" id="inputbar" style="display:none">
+      <button class="ibtn" id="micBtn" title="Voice message" onclick="toggleRec()">&#x1F3A4;</button>
+      <button class="ibtn" title="Take a photo" onclick="takePhoto()">&#x1F4F7;</button>
+      <input id="textIn" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendText()">
+      <button class="ibtn" style="background:var(--accent);color:#fff;border-color:var(--accent);" onclick="sendText()">&#x27A4;</button>
+    </div>
+  </div>
+</div>
+
+<!-- call overlay -->
+<div id="callOverlay">
+  <div class="call-top">
+    <div class="t" id="callTitle">Call</div>
+    <div class="dur" id="callDur">0:00</div>
+    <div class="spacer"></div>
+    <div style="font-size:12px;opacity:.7;" id="callPeerInfo"></div>
+  </div>
+  <div class="call-videos" id="callVideos">
+    <div class="vwrap"><video id="localVid" autoplay muted playsinline></video><div class="tag">You</div></div>
+    <div class="vwrap" id="remotePlaceholder"><div class="tag">No one joined yet</div></div>
+  </div>
+  <div class="call-controls">
+    <button class="ccbtn" id="micToggle" onclick="toggleMic()" title="Microphone">&#x1F3A4;</button>
+    <button class="ccbtn" id="camToggle" onclick="toggleCam()" title="Camera">&#x1F4F9;</button>
+    <button class="ccbtn hangup" onclick="endCall()" title="Hang up">&#x1F5D1;</button>
+  </div>
+</div>
+
+<!-- login -->
+<div id="login">
+  <div class="login-card">
+    <div class="login-logo"></div>
+    <h1>GroupMe</h1>
+    <p>for Linux</p>
+    <input id="loginName" placeholder="Your name" autocomplete="off">
+    <button id="loginBtn">Enter &#x27A4;</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const api = (path, body) => fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body||{})}).then(r=>r.json());
+
+let ME = localStorage.getItem('guser') || '';
+let myGroups = [];
+let curGroup = null;      // group id
+let revRef = 0;
+let pollTimer = null;
+
+// ---------------- groups ----------------
+function renderGroups(){
+  const list = $('grpList'); list.innerHTML='';
+  if(!myGroups.length){ list.innerHTML='<div style="padding:16px;color:var(--text2);font-size:13px;">Create a group and share its code.</div>'; return; }
+  myGroups.forEach(g=>{
+    const row = document.createElement('div');
+    row.className = 'group-row' + (g.id===curGroup?' active':'');
+    row.innerHTML = '<div class="gicon">'+g.name[0].toUpperCase()+'</div><div><div class="gname">'+g.name+'</div><div class="gmeta">'+g.members.length+' members &middot; code: '+g.id+'</div></div>';
+    row.onclick = () => openGroup(g.id);
+    list.appendChild(row);
+  });
+}
+
+async function refreshGroups(){
+  const r = await api('/api/login', {name:ME});
+  if(r.groups){ myGroups = r.groups; renderGroups(); }
+}
+
+async function createGroup(){
+  const name = $('grpName').value.trim();
+  if(!name){ toast('Enter a group name'); return; }
+  const r = await api('/api/groups', {name, by:ME});
+  if(r.group){ $('grpName').value=''; myGroups.push(r.group); renderGroups(); openGroup(r.group.id); toast('Group created — code: '+r.group.id); }
+}
+
+async function joinGroup(){
+  const id = $('grpJoinId').value.trim();
+  if(!id){ toast('Enter a group code'); return; }
+  const r = await api('/api/groups/'+id+'/join', {name:ME});
+  if(r.group){ $('grpJoinId').value=''; myGroups.push(r.group); renderGroups(); openGroup(id); }
+  else toast(r.error||'Could not join');
+}
+
+// ---------------- chat ----------------
+async function openGroup(gid){
+  curGroup = gid; revRef = 0;
+  renderGroups();
+  $('chatHead').style.display='flex';
+  $('inputbar').style.display='flex';
+  $('msgs').innerHTML='';
+  await loadGroup();
+  pollTimer = setInterval(pollGroup, 2500);
+}
+
+async function loadGroup(){
+  const r = await fetch('/api/groups/'+curGroup).then(x=>x.json());
+  if(!r.id){ toast('Group not found'); return; }
+  $('gIcon').textContent = r.name[0].toUpperCase();
+  $('gTitle').textContent = r.name;
+  $('gSub').textContent = r.members.length + ' members';
+  revRef = r.rev;
+  renderMsgs(r.messages||[]);
+  const btn = $('callBtn');
+  if(r.call){ btn.textContent = 'Join call'; btn.classList.add('joining'); btn.classList.remove('live'); }
+  else if(inCall){ btn.textContent = 'In call'; btn.classList.add('live'); }
+  else { btn.textContent = 'Start call'; btn.classList.remove('joining','live'); }
+}
+
+function renderMsgs(msgs){
+  const box = $('msgs');
+  if(box.textContent === 'Select or create a group to start chatting') box.innerHTML='';
+  msgs.forEach(m=>{
+    const wrap = document.createElement('div');
+    wrap.className = 'm' + (m.from===ME?' mine':'') + (m.from==='system'?' system':'');
+    let body='';
+    if(m.media){
+      if((m.mime||'').indexOf('audio')===0) body = '<audio controls src="'+m.media+'"></audio>';
+      else body = '<img src="'+m.media+'">';
+    } else body = m.text;
+    wrap.innerHTML = (m.from==='system'?'':'<div class="who">'+(m.from===ME?'You':'@'+m.from)+'</div>') +
+                     '<div class="body">'+body+'</div>' +
+                     '<div class="time">'+new Date(m.ts).toLocaleTimeString()+'</div>';
+    box.appendChild(wrap);
+  });
+  box.scrollTop = box.scrollHeight;
+}
+
+async function pollGroup(){
+  if(!curGroup) return;
+  const r = await fetch('/api/groups/'+curGroup+'/poll?since='+revRef+'&me='+ME).then(x=>x.json());
+  if(r.messages && r.messages.length){ renderMsgs(r.messages); }
+  if(r.rev !== undefined) revRef = r.rev;
+  const btn = $('callBtn');
+  if(r.call){ btn.textContent = 'Join call'; btn.classList.add('joining'); btn.classList.remove('live'); }
+  else if(!inCall){ btn.textContent = 'Start call'; btn.classList.remove('joining','live'); }
+}
+
+async function sendText(){
+  const text = $('textIn').value.trim();
+  if(!text || !curGroup) return;
+  $('textIn').value='';
+  const r = await api('/api/groups/'+curGroup+'/send', {from:ME, text});
+  if(r.ok){ revRef = r.rev; pollGroup(); } else toast(r.error||'Failed');
+}
+
+// ---------------- media helpers ----------------
+function dataURLof(blob){
+  return new Promise(res=>{ const fr=new FileReader(); fr.onloadend=()=>res(fr.result); fr.readAsDataURL(blob); });
+}
+async function uploadMedia(kind, data, mime, dur){
+  const r = await api('/api/groups/'+curGroup+'/'+kind, {from:ME, data, mime, dur:dur||null});
+  if(r.ok){ revRef = r.rev; pollGroup(); } else toast(r.error||'Upload failed');
+}
+
+// voice recording
+let rec = {stream:null, mediaRec:null, chunks:[], mime:null};
+async function toggleRec(){
+  if(rec.mediaRec && rec.mediaRec.state==='recording'){ rec.mediaRec.stop(); return; }
+  try{
+    rec.stream = await navigator.mediaDevices.getUserMedia({audio:true});
+  }catch(e){ toast('Microphone denied'); return; }
+  rec.chunks=[];
+  const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' :
+               MediaRecorder.isTypeSupported('audio/ogg;codecs=opus') ? 'audio/ogg;codecs=opus' : '';
+  rec.mime = mime || 'audio/webm';
+  rec.mediaRec = new MediaRecorder(rec.stream, mime?{mimeType:mime}:undefined);
+  rec.mediaRec.ondataavailable = e => { if(e.data && e.data.size) rec.chunks.push(e.data); };
+  rec.mediaRec.onstop = async () => {
+    const blob = new Blob(rec.chunks, {type:rec.mime});
+    const data = await dataURLof(blob);
+    $('micBtn').classList.remove('rec');
+    $('recInd').classList.remove('show');
+    rec.stream.getTracks().forEach(t=>t.stop()); rec.mediaRec=null;
+    await uploadMedia('voice', data, rec.mime, Math.round(blob.size/1000));
+  };
+  rec.mediaRec.start();
+  $('micBtn').classList.add('rec');
+  $('recInd').classList.add('show');
+}
+
+// photo
+async function takePhoto(){
+  try{
+    const ph = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:false});
+    const v = document.createElement('video'); v.srcObject=ph; v.muted=true;
+    await v.play();
+    const cv = document.createElement('canvas');
+    cv.width = v.videoWidth; cv.height = v.videoHeight;
+    cv.getContext('2d').drawImage(v,0,0);
+    const data = cv.toDataURL('image/jpeg',.85);
+    ph.getTracks().forEach(t=>t.stop());
+    await uploadMedia('photo', data, 'image/jpeg');
+  }catch(e){ toast('Camera denied'); }
+}
+
+// ---------------- video calls ----------------
+const ICE = {iceServers:[{urls:'stun:stun.l.google.com:19302'}]};
+let inCall = false, callId = null, isHost = false, hostName = null;
+let localStream = null, pcs = new Map(), iceQueue = new Map(), callSeq = 0, callTimer = null, callSecs = 0;
+
+function pcFor(peer){
+  if(pcs.has(peer)) return pcs.get(peer);
+  const pc = new RTCPeerConnection(ICE);
+  pcs.set(peer, pc);
+  if(localStream) localStream.getTracks().forEach(t=>pc.addTrack(t, localStream));
+  pc.onicecandidate = e => { if(e.candidate) sendSig({type:'ice', to:peer, candidate:e.candidate}); };
+  pc.ontrack = e => attachRemote(peer, e.streams[0]);
+  return pc;
+}
+
+function sendSig(payload){
+  api('/api/call/signal', Object.assign({call_id:callId, from:ME}, payload)).catch(()=>{});
+}
+
+function addIce(peer, cand){
+  const pc = pcs.get(peer);
+  if(!pc) return;
+  if(pc.remoteDescription) pc.addIceCandidate(cand).catch(()=>{});
+  else { if(!iceQueue.has(peer)) iceQueue.set(peer,[]); iceQueue.get(peer).push(cand); }
+}
+function flushIce(peer){
+  const pc = pcs.get(peer); const q = iceQueue.get(peer)||[];
+  iceQueue.delete(peer);
+  q.forEach(c=>pc && pc.addIceCandidate(c).catch(()=>{}));
+}
+
+function ensureRemoteSlot(peer){
+  const box = $('callVideos');
+  let el = box.querySelector('[data-peer="'+peer+'"]');
+  if(!el){
+    el = document.createElement('div');
+    el.className='vwrap'; el.dataset.peer=peer;
+    el.innerHTML = '<video autoplay playsinline></video><div class="tag">@'+peer+'</div>';
+    const ph = $('remotePlaceholder'); if(ph) ph.style.display='none';
+    box.appendChild(el);
+  }
+  return el;
+}
+function attachRemote(peer, stream){
+  const el = ensureRemoteSlot(peer);
+  const v = el.querySelector('video');
+  v.srcObject = stream; v.play().catch(()=>{});
+  const ph = $('remotePlaceholder'); if(ph) ph.style.display='none';
+  $('callPeerInfo').textContent = 'Connected with @' + peer;
+}
+
+function handleSignal(s){
+  if(s.type === 'join'){
+    if(isHost){
+      const slot = ensureRemoteSlot(s.from);
+      slot.querySelector('video').srcObject = null;
+      const pc = pcFor(s.from);
+      if(!pc.localDescription){
+        pc.createOffer().then(o => { pc.setLocalDescription(o); sendSig({type:'offer', to:s.from, sdp:o}); })
+          .catch(()=>{});
+      }
+    }
+  } else if(s.type === 'offer' && !isHost){
+    hostName = s.from;
+    const pc = pcFor(hostName);
+    ensureRemoteSlot(hostName);
+    pc.setRemoteDescription(s.sdp).then(()=>{
+      flushIce(hostName);
+      return pc.createAnswer();
+    }).then(a => { pc.setLocalDescription(a); sendSig({type:'answer', to:hostName, sdp:a}); })
+      .catch(()=>{});
+  } else if(s.type === 'answer' && isHost){
+    const pc = pcs.get(s.from);
+    if(pc && !pc.remoteDescription){ pc.setRemoteDescription(s.sdp).then(()=>flushIce(s.from)).catch(()=>{}); }
+  } else if(s.type === 'ice'){
+    const peer = isHost ? s.from : (hostName || s.from);
+    addIce(peer, s.candidate);
+  }
+}
+
+async function pollCall(){
+  if(!callId) return;
+  try{
+    const res = await fetch('/api/call/poll?call_id='+callId+'&user='+ME+'&since='+callSeq).then(x=>x.json());
+    if(!res.active){ if(inCall) endCallLocal('Call ended'); return; }
+    if(res.seq !== undefined) callSeq = res.seq;
+    (res.signals||[]).forEach(handleSignal);
+  }catch(e){}
+}
+
+async function startCall(){
+  const r = await api('/api/call/start', {group:curGroup, from:ME});
+  if(!r.ok){ toast(r.error||'Could not start'); return; }
+  callId = r.call_id; isHost = true; callSeq = 0; inCall = true;
+  await openCallUI();
+  sendSig({type:'join', to:null});
+  $('callBtn').textContent='In call'; $('callBtn').classList.add('live');
+}
+
+async function joinCall(){
+  let cid = null;
+  try{
+    const info = await fetch('/api/groups/'+curGroup).then(x=>x.json());
+    cid = info.call;
+  }catch(e){}
+  if(!cid){ toast('No active call'); return; }
+  callId = cid; isHost = false; callSeq = 0; inCall = true;
+  await openCallUI();
+  sendSig({type:'join', to:null});
+  $('callBtn').textContent='In call'; $('callBtn').classList.add('live');
+}
+
+function callAction(){
+  if(inCall) return;
+  if($('callBtn').classList.contains('joining')) joinCall();
+  else startCall();
+}
+
+async function openCallUI(){
+  $('callOverlay').classList.add('active');
+  $('callTitle').textContent = 'Call — ' + ($('gTitle').textContent||'Group');
+  callSecs = 0;
+  clearInterval(callTimer);
+  callTimer = setInterval(()=>{ callSecs++; $('callDur').textContent = fmt(callSecs); }, 1000);
+  try{
+    localStream = await navigator.mediaDevices.getUserMedia({audio:true, video:{width:{ideal:640},height:{ideal:480}}});
+    $('localVid').srcObject = localStream;
+    // make sure existing peers get tracks
+    pcs.forEach((pc,peer)=>{ localStream.getTracks().forEach(t=>pc.addTrack(t, localStream)); });
+  }catch(e){ toast('Camera/mic denied — calls disabled'); inCall=false; }
+  setInterval(pollCall, 1000);
+}
+
+function fmt(s){ return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+
+function endCallLocal(msg){
+  clearInterval(callTimer);
+  $('callOverlay').classList.remove('active');
+  if(msg) toast(msg);
+  if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+  pcs.forEach(pc=>pc.close()); pcs.clear(); iceQueue.clear();
+  inCall=false; callId=null; isHost=false; hostName=null;
+  $('localVid').srcObject=null;
+  $('callVideos').querySelectorAll('.vwrap[data-peer]').forEach(el=>el.remove());
+  $('remotePlaceholder').style.display='';
+  $('callBtn').classList.remove('live');
+  $('callBtn').textContent='Start call';
+  if(curGroup) loadGroup();
+}
+async function endCall(){
+  if(callId) await api('/api/call/end', {call_id:callId});
+  endCallLocal();
+}
+
+function toggleMic(){
+  if(!localStream) return;
+  const t = localStream.getAudioTracks()[0];
+  if(t){ t.enabled=!t.enabled; $('micToggle').classList.toggle('off', !t.enabled); }
+}
+function toggleCam(){
+  if(!localStream) return;
+  const t = localStream.getVideoTracks()[0];
+  if(t){ t.enabled=!t.enabled; $('camToggle').classList.toggle('off', !t.enabled); }
+}
+
+// ---------------- boot ----------------
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._x); t._x=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+$('loginBtn').onclick = async () => {
+  const name = $('loginName').value.trim();
+  if(!name){ toast('Enter your name'); return; }
+  ME = name; localStorage.setItem('guser', name);
+  $('whoami').textContent = 'Signed in as ' + name;
+  $('login').style.display='none';
+  const r = await api('/api/login', {name});
+  if(r.groups){ myGroups=r.groups; renderGroups(); }
+};
+
+if(ME){ $('login').style.display='none'; $('whoami').textContent='Signed in as '+ME; api('/api/login',{name:ME}).then(r=>{ myGroups=r.groups||[]; renderGroups(); }); }
+</script>
+</body>
+</html>
