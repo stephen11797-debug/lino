@@ -127,7 +127,7 @@ licenses:
 
 ## Credits
 
-Built by Stephen Campbell. Special thanks to:
+Built by Studio. Special thanks to:
 - The Ollama team for making local AI easy
 - The Vosk team for offline speech recognition
 - The Piper/Namex team for neural TTS voices

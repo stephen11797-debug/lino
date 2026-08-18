@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Stephen Voice — floating offline voice assistant prompt.
+Lino — floating offline voice assistant.
 Looks like an Android assistant, always on top, fully offline.
 
-Uses:  GTK (window) + vosk (speech-to-text) + spd-say/espeak-ng (speech).
+Uses:  GTK (window) + vosk (speech-to-text) + Piper/TTS (speech).
 If vosk isn't installed yet, the app still runs and greets you,
 and voice recognition turns on automatically once vosk is ready.
 """
@@ -129,7 +129,7 @@ TOOLS = [
             "action": {"type": "string", "enum": ["up", "down", "mute"]}},
             "required": ["action"]}}},
     {"type": "function", "function": {"name": "look_at_screen",
-        "description": "Take a screenshot and describe what is currently on the screen. Use when Stephen asks what you see, what's on the screen, or needs help finding something visible.",
+        "description": "Take a screenshot and describe what is currently on the screen. Use when the user asks what you see, what's on the screen, or needs help finding something visible.",
         "parameters": {"type": "object", "properties": {
             "question": {"type": "string", "description": "Optional question about the screen contents"}}}}},
     {"type": "function", "function": {"name": "open_chat",
@@ -298,7 +298,7 @@ class EchoBrain:
         if _has(t, "do you know my name", "what is my name"):
             if self.known_name:
                 return "Your name is " + self.user_name + "."
-            return "You haven't told me your name yet. You can say, my name is Stephen."
+            return "You haven't told me your name yet. You can say, my name is Studio."
 
         # --- how are you ---
         if _has(t, "how are you", "how do you feel", "what's up", "whats up",
@@ -821,7 +821,7 @@ class BubbleFace(Gtk.DrawingArea):
         return False
 
 
-class StephenVoice(Gtk.Window):
+class LinoVoice(Gtk.Window):
     def __init__(self):
         super().__init__(type=Gtk.WindowType.TOPLEVEL)
         self.set_title("Lino Assistant")
