@@ -43,7 +43,7 @@ COLOR_MUTED = "#8a8a9a"
 
 BUBBLE_SIZE = 160
 # Photo shown in the bubble. Looks in the project dir first, then ~/Pictures.
-BUBBLE_PHOTO = os.path.join(BASE, "bubble.jpg")
+BUBBLE_PHOTO = os.path.join(BASE, "lino-icon.png")
 if not os.path.exists(BUBBLE_PHOTO):
     BUBBLE_PHOTO = os.path.expanduser("~/Pictures/48257.jpg")
 
