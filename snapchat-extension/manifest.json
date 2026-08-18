@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Snapchat Scheduler",
+  "version": "1.0",
+  "description": "Schedule messages on Snapchat web",
+  "permissions": ["activeTab"],
+  "host_permissions": ["http://localhost:8001/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icon.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "48": "icon.png"
+  }
+}
