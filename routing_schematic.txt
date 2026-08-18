@@ -1,0 +1,46 @@
+STUDIO 1824c — MONITOR MIXER ROUTING (program control model)
+================================================================
+
+INPUTS  (sources that can be sent into any mix)
+  ANALOG (8):  1L 1R | 2L 2R   <- ch1&2 = STEREO pair (lands L/R on main)
+               3 4 5 6 7 8     <- ch3-8 = MONO (one fader each)
+  DIGITAL:     SPDIF L R, ADAT 1..8
+  DAW (8):     DAW1/2 = STEREO pair, DAW3-8 = MONO   <- computer playback (virtual)
+
+  >> each input has a Left and Right fader into every bus <<
+  >> the 4 ANALOG groups each take the 8 analog + 8 DAW sends <<
+
+4 MONITOR GROUPS TOTAL  (each = one stereo bus, 4 x 2 = 8 analog outs)
+    Mix 1  -> Main Out 1-2   + Headphone 1
+    Mix 2  -> Line Out 3-4   + Headphone 2   <-- HP2 grouped w/ outs 3/4
+    Mix 3  -> Line Out 5/6
+    Mix 4  -> Line Out 7/8
+  >> 1 master fader per group = 4 group faders <<
+
+DIGITAL OUTS (separate from the 4 monitor groups; not shown as groups)
+    S/PDIF Out L/R
+    ADAT Out 1..8
+
+HEADPHONES
+  HP1  follows Mix 1  (Main 1-2 + HP1)
+  HP2  follows Mix 2  (Line 3-4 + HP2)
+
+SIGNAL FLOW (per input channel, replicated for all 36)
+     in1 --+--fader L--> stereo bus 1 --> Main L / HP1
+           +--fader R--> stereo bus 1 --> Main R / HP1
+           ... (same input also feeds buses 2..9 with own L/R faders)
+
+FRONT-PANEL BUTTONS (4)   --- via ALSA mixer, works as user, no root
+   48V     Line(ch1/2)     Mono(Main)     Mute(Main)
+
+CONTROL PATHS
+   Buttons .... ALSA  (card S1824c)        [live now]
+   Faders ..... vendor USB / libusb        [needs root or udev rule]
+
+OFFICIAL UC SURFACE MONITOR MIXER (PreSonus manual)
+   "18x8 onboard DSP monitor mixer" = 18 sources x 8 outs = 4 stereo mixes.
+   Sources = input channels + DAW return channels.
+   Settings: Show ADAT (off=hide, expansion), Peak Hold, Mixer Bypass.
+   Per-channel + per-mix levels, solo/mute.
+   >>> Our app matches this. NOT yet controllable via ported protocol:
+       per-channel solo/mute, Mixer Bypass. (faders + 4 buttons only) <<<
