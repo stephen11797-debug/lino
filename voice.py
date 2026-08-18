@@ -2143,5 +2143,5 @@ if __name__ == "__main__":
     except OSError:
         print("Lino is already running (single-instance lock).")
         sys.exit(0)
-    app = StephenVoice()
+    app = LinoVoice()
     Gtk.main()
