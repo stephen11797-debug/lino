@@ -32,7 +32,7 @@ from gi.repository import Gtk, Gdk, GLib, Pango, GdkPixbuf
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 VENV_PY = os.path.join(BASE, ".venv", "bin", "python")
-USER_NAME = "Stephen Campbell"
+USER_NAME = "Stephen's Studio"
 ASSISTANT_NAME = "Lino"
 GREETING = "Hi " + USER_NAME + ", I am " + ASSISTANT_NAME
 
@@ -262,7 +262,7 @@ import random as _rnd
 class EchoBrain:
     """Rule-based conversation engine with memory (fully offline)."""
 
-    def __init__(self, user_name="Stephen"):
+    def __init__(self, user_name="Stephen's Studio"):
         self.user_name = user_name
         self.last_topic = None
         self.heard_count = 0
@@ -977,7 +977,7 @@ class StephenVoice(Gtk.Window):
         self.audio_queue = queue.Queue()
         self.rec_thread = None
         self._stt = None
-        self.brain = EchoBrain(user_name="Stephen")
+        self.brain = EchoBrain(user_name="Stephen's Studio")
         self.chat_history = []
         self.ai_mode = "smart"
         self.ai_model = AI_MODEL
