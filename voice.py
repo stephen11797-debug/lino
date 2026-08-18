@@ -32,7 +32,7 @@ from gi.repository import Gtk, Gdk, GLib, Pango, GdkPixbuf
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 VENV_PY = os.path.join(BASE, ".venv", "bin", "python")
-USER_NAME = "Stephen's Studio"
+USER_NAME = "Studio"
 ASSISTANT_NAME = "Lino"
 GREETING = "Hi " + USER_NAME + ", I am " + ASSISTANT_NAME
 
@@ -86,17 +86,17 @@ AI_MODELS = {
     "gemma2:2b": "Google small model",
     "mistral:7b": "strong, needs more RAM",
 }
-AI_SYSTEM = ("You are Lino, Stephen's friendly, helpful AI companion running "
-             "offline on his PC. Talk like a natural, warm human friend — the "
+AI_SYSTEM = ("You are Lino, a friendly, helpful AI assistant running "
+             "offline on the user's PC. Talk like a natural, warm human friend — the "
              "way Google Gemini or a great assistant would: casual, curious, "
              "never robotic or lecture-y. Be concise (1-3 short sentences) "
              "unless he wants depth. Offer advice, practical suggestions, and "
-             "ask a light follow-up now and then. You can control Stephen's "
-             "computer using the provided tools (open_app, click, type_text, "
-             "press_key, scroll, volume, open_chat, look_at_screen). Use a tool "
-             "whenever Stephen asks for an action; then say in one short "
-             "sentence what you did. If it is a normal question or he just "
-             "wants to chat, answer plainly with no tool call.")
+             "ask a light follow-up now and then. You can control the computer using "
+             "the provided tools (open_app, click, type_text, press_key, scroll, "
+             "volume, open_chat, look_at_screen). Use a tool whenever the user asks "
+             "for an action; then say in one short sentence what you did. If it is a "
+             "normal question or they just want to chat, answer plainly with no "
+             "tool call.")
 
 # Native Ollama tools (much more reliable than text action tags).
 TOOLS = [
@@ -262,7 +262,7 @@ import random as _rnd
 class EchoBrain:
     """Rule-based conversation engine with memory (fully offline)."""
 
-    def __init__(self, user_name="Stephen's Studio"):
+    def __init__(self, user_name="Studio"):
         self.user_name = user_name
         self.last_topic = None
         self.heard_count = 0
@@ -977,7 +977,7 @@ class StephenVoice(Gtk.Window):
         self.audio_queue = queue.Queue()
         self.rec_thread = None
         self._stt = None
-        self.brain = EchoBrain(user_name="Stephen's Studio")
+        self.brain = EchoBrain(user_name="Studio")
         self.chat_history = []
         self.ai_mode = "smart"
         self.ai_model = AI_MODEL
