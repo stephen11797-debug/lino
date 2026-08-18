@@ -25,9 +25,17 @@ Thumbs.db
 model/
 model_small_backup/
 
+# Piper voice models (third-party, download separately)
+voices/*
+!voices/.gitkeep
+!voices/README.md
+
 # Build artifacts
 *.deb
 lintian*
+
+# Debian packaging
+DEBIAN/
 
 # IDE
 .vscode/
@@ -35,9 +43,12 @@ lintian*
 *.swp
 *.swo
 
-# Local files
+# Local config files (not part of core app)
 *.log
 .vs/
 .vm/
 speak.wav
 capture.wav
+stephen_studio.html
+studio.html
+voice.html.bak
