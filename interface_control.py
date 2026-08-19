@@ -1,3 +1,5 @@
+# Copyright (c) 2026 Stephen's Studio
+# Licensed under the MIT License. See LICENSE file for details.
 import math
 import struct
 

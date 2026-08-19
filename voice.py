@@ -32,7 +32,7 @@ from gi.repository import Gtk, Gdk, GLib, Pango, GdkPixbuf
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 VENV_PY = os.path.join(BASE, ".venv", "bin", "python")
-USER_NAME = "Studio"
+USER_NAME = "User"
 ASSISTANT_NAME = "Lino"
 GREETING = "Hi " + USER_NAME + ", I am " + ASSISTANT_NAME
 
@@ -42,10 +42,10 @@ COLOR_TEXT = "#ffffff"
 COLOR_MUTED = "#8a8a9a"
 
 BUBBLE_SIZE = 160
-# Photo shown in the bubble. Looks in the project dir first, then ~/Pictures.
-BUBBLE_PHOTO = os.path.join(BASE, "lino-icon.png")
+# Photo shown in the bubble. Private icon first, then project, then fallback.
+BUBBLE_PHOTO = os.path.join(BASE, "lino-penguin.png")
 if not os.path.exists(BUBBLE_PHOTO):
-    BUBBLE_PHOTO = os.path.expanduser("~/Pictures/48257.jpg")
+    BUBBLE_PHOTO = os.path.join(BASE, "lino-penguin.png")
 
 
 TTS_VOICE_TYPE = "male1"   # fallback voice (only used if Piper isn't installed)
@@ -262,12 +262,13 @@ import random as _rnd
 class EchoBrain:
     """Rule-based conversation engine with memory (fully offline)."""
 
-    def __init__(self, user_name="Studio"):
+    def __init__(self, user_name="User"):
         self.user_name = user_name
         self.last_topic = None
         self.heard_count = 0
         self.mood = "good"
         self.known_name = False
+        self.pending_name = None
 
     def reply(self, text):
         """Return a reply string, or None if this wasn't conversation."""
@@ -292,13 +293,20 @@ class EchoBrain:
         if _has(t, "my name is", "i am", "i'm"):
             name = _grab_after(t, "my name is", "i am", "i'm")
             if name:
-                self.user_name = name.title()
-                self.known_name = True
-                return "Nice to meet you, " + self.user_name + "!"
+                self.pending_name = name.title()
+                return "Nice to meet you, " + self.pending_name + "! Do you mind if I save that for future conversations?"
+        if _has(t, "yes", "sure", "okay", "ok", "please do", "go ahead") and self.pending_name:
+            self.user_name = self.pending_name
+            self.known_name = True
+            self.pending_name = None
+            return "Got it! I'll remember your name is " + self.user_name + "."
+        if _has(t, "no", "don't", "do not", "forget it", "never mind") and self.pending_name:
+            self.pending_name = None
+            return "No problem, I won't save it."
         if _has(t, "do you know my name", "what is my name"):
             if self.known_name:
                 return "Your name is " + self.user_name + "."
-            return "You haven't told me your name yet. You can say, my name is Studio."
+            return "You haven't told me your name yet. You can say, my name is User."
 
         # --- how are you ---
         if _has(t, "how are you", "how do you feel", "what's up", "whats up",
@@ -977,7 +985,7 @@ class LinoVoice(Gtk.Window):
         self.audio_queue = queue.Queue()
         self.rec_thread = None
         self._stt = None
-        self.brain = EchoBrain(user_name="Studio")
+        self.brain = EchoBrain(user_name="User")
         self.chat_history = []
         self.ai_mode = "smart"
         self.ai_model = AI_MODEL
@@ -1634,6 +1642,7 @@ class LinoVoice(Gtk.Window):
     def _download_dialog(self, append):
         dlg = Gtk.Dialog(title="Download an AI model", transient_for=self,
                          flags=Gtk.DialogFlags.DESTROY_WITH_PARENT)
+        dlg.set_modal(False)
         dlg.set_default_size(380, -1)
         box = dlg.get_content_area()
         lbl = Gtk.Label(label="Pick a model, or type any ollama name:")

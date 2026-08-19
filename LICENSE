@@ -2,6 +2,14 @@ MIT License
 
 Copyright (c) 2026 Stephen's Studio
 
+Supported Hardware:
+- GPU: NVIDIA GeForce RTX 3070 (EVGA FTW3 Ultra LHR)
+- CPU: Intel Core i7-9700K
+- Motherboard: ASRock B365M Phantom Gaming 4 (Polychrome V1 RGB)
+- RAM: 4× Corsair Vengeance Pro RGB
+- Fan Controller: Corsair iCUE COMMANDER Core
+- Case: Custom RGB strips (ASRock ARGB header)
+
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights

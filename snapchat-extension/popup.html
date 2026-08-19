@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { width: 360px; font-family: sans-serif; padding: 12px; margin: 0; background: #1a1a2e; color: #eee; }
+  h3 { margin: 0 0 10px 0; color: #fffc00; }
+  label { font-size: 13px; margin-top: 6px; display: block; }
+  input, select { width: 100%; padding: 6px; margin-top: 3px; border: 1px solid #444; border-radius: 4px; background: #16213e; color: #eee; box-sizing: border-box; }
+  button { width: 100%; padding: 8px; margin-top: 10px; background: #fffc00; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
+  button:hover { background: #e6e300; }
+  .status { margin-top: 8px; font-size: 12px; color: #aaa; }
+  .pending { margin-top: 10px; font-size: 12px; }
+  .pending-item { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #333; }
+  .pending-item button { width: auto; padding: 2px 8px; margin: 0; font-size: 11px; background: #e74c3c; color: white; }
+</style>
+</head>
+<body>
+  <h3>Schedule a Message</h3>
+  <label>From:</label>
+  <input type="text" id="user" placeholder="Your username">
+  <label>To:</label>
+  <select id="friend"><option value="">Type username first...</option></select>
+  <label>Message:</label>
+  <input type="text" id="msg" placeholder="Type your message...">
+  <label>Send at:</label>
+  <input type="datetime-local" id="time">
+  <button id="schedule">Schedule</button>
+  <div class="status" id="status"></div>
+  <div class="pending" id="pending"></div>
+  <script src="popup.js"></script>
+</body>
+</html>

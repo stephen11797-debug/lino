@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="520" font-family="sans-serif" font-size="12">
+  <rect x="0" y="0" width="900" height="520" fill="#1e1e22"/>
+  <text x="20" y="28" fill="#fff" font-size="16">Studio 1824c — Monitor Mix Routing</text>
+
+  <!-- INPUTS -->
+  <text x="20" y="56" fill="#9fd">INPUTS (sent into any mix)</text>
+  <g fill="#2b3b55" stroke="#5af" stroke-width="1">
+    <rect x="20" y="66" width="120" height="22"/><rect x="20" y="92" width="120" height="22"/>
+    <rect x="20" y="118" width="120" height="22"/><rect x="20" y="144" width="120" height="22"/>
+    <rect x="20" y="170" width="120" height="22"/><rect x="20" y="196" width="120" height="22"/>
+    <rect x="20" y="222" width="120" height="22"/><rect x="20" y="248" width="120" height="22"/>
+  </g>
+  <g fill="#fff">
+    <text x="28" y="81">In 1 (L)</text><text x="28" y="107">In 2 (R)</text>
+    <text x="28" y="133">In 3</text><text x="28" y="159">In 4</text>
+    <text x="28" y="185">In 5</text><text x="28" y="211">In 6</text>
+    <text x="28" y="237">In 7</text><text x="28" y="263">In 8</text>
+  </g>
+  <g fill="#2b3b55" stroke="#5af" stroke-width="1">
+    <rect x="20" y="280" width="120" height="22"/><rect x="20" y="306" width="120" height="22"/>
+    <rect x="20" y="332" width="120" height="22"/>
+  </g>
+  <g fill="#fff">
+    <text x="28" y="295">SPDIF L/R</text><text x="28" y="321">ADat 1-8</text>
+    <text x="28" y="347">DAW 1-8 (PC, virtual)</text>
+  </g>
+
+  <!-- 4 ANALOG GROUPS -->
+  <text x="360" y="56" fill="#9fd">4 ANALOG MONITOR GROUPS (each stereo = 2 outs)</text>
+  <g fill="#3a2b55" stroke="#a5f" stroke-width="1">
+    <rect x="360" y="70" width="200" height="40"/><rect x="360" y="130" width="200" height="40"/>
+    <rect x="360" y="190" width="200" height="40"/><rect x="360" y="250" width="200" height="40"/>
+  </g>
+  <g fill="#fff">
+    <text x="372" y="88">Mix1: Main 1-2 + HP1</text>
+    <text x="372" y="148">Mix2: Line 3-4 + HP2</text>
+    <text x="372" y="208">Mix3: Line 5-6</text>
+    <text x="372" y="268">Mix4: Line 7-8</text>
+  </g>
+
+  <!-- DIGITAL GROUPS -->
+  <g fill="#243b2b" stroke="#5fa" stroke-width="1">
+    <rect x="360" y="310" width="200" height="30"/><rect x="360" y="348" width="200" height="30"/>
+    <rect x="360" y="386" width="200" height="30"/><rect x="360" y="424" width="200" height="30"/>
+    <rect x="360" y="462" width="200" height="30"/>
+  </g>
+  <g fill="#fff">
+    <text x="372" y="330">Mix5: SPDIF</text><text x="372" y="368">Mix6: ADAT 1-2</text>
+    <text x="372" y="406">Mix7: ADAT 3-4</text><text x="372" y="444">Mix8: ADAT 5-6</text>
+    <text x="372" y="482">Mix9: ADAT 7-8</text>
+  </g>
+
+  <!-- OUTPUTS -->
+  <text x="640" y="56" fill="#9fd">PHYSICAL OUTS (8 analog = 4x2)</text>
+  <g fill="#553b2b" stroke="#fa5" stroke-width="1">
+    <rect x="640" y="70" width="180" height="22"/><rect x="640" y="96" width="180" height="22"/>
+    <rect x="640" y="130" width="180" height="22"/><rect x="640" y="156" width="180" height="22"/>
+    <rect x="640" y="190" width="180" height="22"/><rect x="640" y="216" width="180" height="22"/>
+    <rect x="640" y="250" width="180" height="22"/><rect x="640" y="276" width="180" height="22"/>
+  </g>
+  <g fill="#fff">
+    <text x="648" y="85">Main L</text><text x="648" y="111">Main R</text>
+    <text x="648" y="145">Line 3</text><text x="648" y="171">Line 4</text>
+    <text x="648" y="205">Line 5</text><text x="648" y="231">Line 6</text>
+    <text x="648" y="265">Line 7</text><text x="648" y="291">Line 8</text>
+  </g>
+
+  <!-- BUTTONS -->
+  <text x="640" y="330" fill="#9fd">FRONT PANEL BUTTONS (ALSA)</text>
+  <g fill="#444" stroke="#aaa" stroke-width="1">
+    <rect x="640" y="340" width="80" height="26"/><rect x="728" y="340" width="80" height="26"/>
+    <rect x="640" y="374" width="80" height="26"/><rect x="728" y="374" width="80" height="26"/>
+  </g>
+  <g fill="#fff">
+    <text x="652" y="358">48V</text><text x="740" y="358">Line 1/2</text>
+    <text x="652" y="392">Mono</text><text x="740" y="392">Mute Main</text>
+  </g>
+
+  <!-- arrows inputs->groups -->
+  <g stroke="#5af" stroke-width="1" fill="none" opacity="0.6">
+    <path d="M140 100 C 260 100, 260 90, 360 90"/>
+    <path d="M140 160 C 260 160, 260 150, 360 150"/>
+    <path d="M140 220 C 260 220, 260 210, 360 210"/>
+    <path d="M140 280 C 260 280, 260 270, 360 270"/>
+  </g>
+  <!-- arrows groups->outs -->
+  <g stroke="#fa5" stroke-width="1" fill="none" opacity="0.6">
+    <path d="M560 90 C 620 90, 620 81, 640 81"/>
+    <path d="M560 150 C 620 150, 620 103, 640 103"/>
+    <path d="M560 210 C 620 210, 620 165, 640 165"/>
+    <path d="M560 270 C 620 270, 620 205, 640 205"/>
+  </g>
+</svg>

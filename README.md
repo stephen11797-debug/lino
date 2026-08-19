@@ -66,7 +66,7 @@ python3 voice.py
 Edit constants at the top of `voice.py`:
 
 ```python
-USER_NAME = "Studio"          # Name used in greetings
+USER_NAME = "User"          # Name used in greetings
 ASSISTANT_NAME = "Lino"      # Lino's name
 BUBBLE_PHOTO = "..."             # Avatar image path
 AI_MODEL = "qwen2.5:7b"         # Ollama model name
@@ -127,7 +127,7 @@ licenses:
 
 ## Credits
 
-Built by Studio. Special thanks to:
+Built by the Lino community. Special thanks to:
 - The Ollama team for making local AI easy
 - The Vosk team for offline speech recognition
 - The Piper/Namex team for neural TTS voices
