@@ -101,7 +101,7 @@ class LinoInstaller(Gtk.Window):
         overlay_box.pack_start(header, False, False, 0)
 
         # Icon
-        icon_path = os.path.join(SCRIPT_DIR, "lino-icon.png")
+        icon_path = os.path.join(SCRIPT_DIR, "lino-penguin.png")
         if os.path.exists(icon_path):
             try:
                 pb = GdkPixbuf.Pixbuf.new_from_file_at_size(icon_path, 90, 90)
