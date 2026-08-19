@@ -19,6 +19,25 @@ import interface_control as ic
 PRESET_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "interface_preset.json")
 
+CARD_CFG_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "interface_cards.json")
+
+
+def _load_card_cfg():
+    try:
+        with open(CARD_CFG_PATH) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_card_cfg(cfg):
+    try:
+        with open(CARD_CFG_PATH, "w") as f:
+            json.dump(cfg, f, indent=2)
+    except Exception as e:
+        print("save card cfg failed:", e)
+
 INPUT_DEFS = [
     ("In 1/2", [0, 1], True),
     ("In 3", [2], False),
@@ -85,6 +104,20 @@ GtkCheckButton { color: #c9c9d4; }
 """
 
 
+def _scan_webcams():
+    v4l_names = set()
+    try:
+        for d in os.listdir("/sys/class/video4linux"):
+            try:
+                with open(os.path.join("/sys/class/video4linux", d, "name")) as f:
+                    v4l_names.add(f.read().strip())
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return v4l_names
+
+
 def _scan_alsa_cards():
     cards = []
     try:
@@ -93,6 +126,7 @@ def _scan_alsa_cards():
         ).stdout
     except Exception:
         return cards
+    webcams = _scan_webcams()
     for m in re.finditer(
         r"card (\d+): (\S+) \[([^\]]+)\], device (\d+): ([^\]]+)\[([^\]]+)\]", out
     ):
@@ -102,6 +136,11 @@ def _scan_alsa_cards():
         dev_num = int(m.group(4))
         dev_id = m.group(5)
         dev_name = m.group(6).strip()
+        is_webcam = False
+        for vn in webcams:
+            if vn and (vn in card_name or card_name in vn):
+                is_webcam = True
+                break
         cards.append({
             "card": card_num,
             "id": card_id,
@@ -110,6 +149,7 @@ def _scan_alsa_cards():
             "dev_name": dev_name,
             "hw": "hw:%s,%d" % (card_id, dev_num),
             "label": "Card %d: %s - %s" % (card_num, card_name, dev_name),
+            "is_webcam": is_webcam,
         })
     return cards
 
@@ -138,23 +178,44 @@ def _download_card_icon(card_id):
 
 _CARD_COLORS = ["#4a90d9", "#d94a4a", "#4ad94a", "#d9a04a", "#a04ad9", "#4ad9d9"]
 
-def _make_card_icon_surface(card_id, card_num, label):
+
+def _card_cfg_get(card_id, key, default):
+    cfg = _load_card_cfg()
+    c = cfg.get(card_id, {})
+    return c.get(key, default)
+
+
+def _card_color(card_id, card_num):
+    return _card_cfg_get(card_id, "color", _CARD_COLORS[card_num % len(_CARD_COLORS)])
+
+
+def _card_label(card_id, fallback):
+    return _card_cfg_get(card_id, "label", fallback)
+
+
+def _make_card_icon_surface(card_id, card_num, label, is_webcam=False):
     try:
         from cairo import ImageSurface, FORMAT_ARGB32, Context
         size = 64
         surface = ImageSurface(FORMAT_ARGB32, size, size)
         ctx = Context(surface)
-        color_hex = _CARD_COLORS[card_num % len(_CARD_COLORS)]
+        color_hex = _card_color(card_id, card_num)
         r = int(color_hex[1:3], 16) / 255.0
         g = int(color_hex[3:5], 16) / 255.0
         b = int(color_hex[5:7], 16) / 255.0
         ctx.set_source_rgb(r, g, b)
         ctx.arc(size / 2, size / 2, size / 2 - 2, 0, 2 * 3.14159)
         ctx.fill()
+        if is_webcam:
+            ctx.set_source_rgb(1.0, 1.0, 1.0)
+            ctx.select_font_face("Sans", 0, 0)
+            ctx.set_font_size(26)
+            ctx.move_to(size / 2 - 14, size / 2 + 10)
+            ctx.show_text("\N{VIDEO CAMERA}")
         ctx.set_source_rgb(1.0, 1.0, 1.0)
         ctx.select_font_face("Sans", 0, 1)
         ctx.set_font_size(14)
-        short = label.split()[0][:6]
+        short = _card_label(card_id, label).split()[0][:6]
         ext = ctx.text_extents(short)
         ctx.move_to(size / 2 - ext.width / 2, size / 2 + ext.height / 3)
         ctx.show_text(short)
@@ -270,18 +331,21 @@ class InterfaceApp:
         self._w_card_btns[None] = none_btn
 
         for i, c in enumerate(self.alsa_cards):
-            icon_path = _download_card_icon(c["id"])
+            icon_path = _make_card_icon_surface(c["id"], i, c["name"], c["is_webcam"])
             if not icon_path or not os.path.exists(icon_path):
-                icon_path = _make_card_icon_surface(c["id"], i, c["name"])
+                icon_path = _download_card_icon(c["id"])
             btn = Gtk.ToggleButton()
             if icon_path and os.path.exists(icon_path):
                 img = Gtk.Image.new_from_file(icon_path)
                 btn.set_image(img)
                 btn.set_always_show_image(True)
             else:
-                btn.set_label(c["label"][:12])
+                btn.set_label(_card_label(c["id"], c["label"][:12]))
             btn.set_relief(Gtk.ReliefStyle.NORMAL)
-            btn.set_tooltip_text("%s\nhw: %s\n%s" % (c["label"], c["hw"], c["dev_name"]))
+            tip = "%s\nhw: %s\n%s" % (c["label"], c["hw"], c["dev_name"])
+            if c["is_webcam"]:
+                tip += "\n[WEBCAM] mic disabled in program"
+            btn.set_tooltip_text(tip)
             btn.connect("toggled", self._w_on_card_select, c["hw"])
             self._w_card_box.add(btn)
             self._w_card_btns[c["hw"]] = btn
@@ -291,6 +355,12 @@ class InterfaceApp:
         self._w_card_info = Gtk.Label(label="No card selected")
         self._w_card_info.get_style_context().add_class("tiny")
         inner.add(self._w_card_info)
+
+        cust_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        cust = Gtk.Button(label="Customize Cards...")
+        cust.connect("clicked", self._w_customize_cards)
+        cust_row.add(cust)
+        inner.add(cust_row)
 
         grp.add(inner)
         vbox.pack_start(grp, False, False, 0)
@@ -481,10 +551,86 @@ class InterfaceApp:
             self._w_wire_list.add(lbl)
         self._w_wire_list.show_all()
 
+    def _w_customize_cards(self, *_):
+        cfg = _load_card_cfg()
+        dlg = Gtk.Dialog(
+            title="Customize Cards", parent=self.window, flags=0,
+            buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                     Gtk.STOCK_OK, Gtk.ResponseType.OK))
+        dlg.set_default_size(520, 380)
+        box = dlg.get_content_area()
+        lbl = Gtk.Label(
+            "Pick a color, name, and enable/disable the mic for each card.\n"
+            "Webcam mics are disabled by default.")
+        lbl.set_line_wrap(True)
+        box.add(lbl)
+        rows = []
+        for i, c in enumerate(self.alsa_cards):
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            row.set_border_width(6)
+            lab = Gtk.Label(label="%s:" % c["id"])
+            lab.set_size_request(70, -1)
+            row.add(lab)
+            default_color = _CARD_COLORS[i % len(_CARD_COLORS)]
+            cur_color = cfg.get(c["id"], {}).get("color", default_color)
+            cb = Gtk.ColorButton()
+            rgba = Gdk.RGBA()
+            rgba.parse(cur_color)
+            cb.set_rgba(rgba)
+            cb.set_use_alpha(False)
+            cb.set_title("Color for %s" % c["id"])
+            row.add(cb)
+            entry = Gtk.Entry()
+            cur_label = cfg.get(c["id"], {}).get("label", "")
+            entry.set_text(cur_label)
+            entry.set_placeholder_text(c["name"])
+            entry.set_size_request(150, -1)
+            row.add(entry)
+            mic = Gtk.CheckButton(label="Mic")
+            cur_mic = cfg.get(c["id"], {}).get("mic", not c["is_webcam"])
+            mic.set_active(cur_mic)
+            if c["is_webcam"]:
+                mic.set_tooltip_text("Webcam mic (audio) enabled")
+            row.add(mic)
+            rows.append((c["id"], cb, entry, mic, c["is_webcam"]))
+            box.add(row)
+        box.show_all()
+        resp = dlg.run()
+        if resp == Gtk.ResponseType.OK:
+            for card_id, cb, entry, mic, is_webcam in rows:
+                rgba = cb.get_rgba()
+                color = "#%02x%02x%02x" % (
+                    int(round(rgba.red * 255)),
+                    int(round(rgba.green * 255)),
+                    int(round(rgba.blue * 255)))
+                entry_text = entry.get_text().strip()
+                cfg[card_id] = {
+                    "color": color,
+                    "label": entry_text,
+                    "mic": mic.get_active(),
+                }
+            _save_card_cfg(cfg)
+            self._build_welcome()
+        dlg.destroy()
+
     def _w_launch(self, *_):
         self.selected_card_hw = self._w_selected
+        cfg = _load_card_cfg()
+        for c in self.alsa_cards:
+            if c["hw"] == self.selected_card_hw and c["is_webcam"]:
+                if not cfg.get(c["id"], {}).get("mic", False):
+                    self.selected_card_hw = None
+                    print("webcam mic disabled - card rejected:", c["label"])
+                    break
         link_idx = self._w_link_combo.get_active()
         self.linked_card_hw = None if link_idx <= 0 else self.alsa_cards[link_idx - 1]["hw"]
+        if self.linked_card_hw:
+            for c in self.alsa_cards:
+                if c["hw"] == self.linked_card_hw and c["is_webcam"]:
+                    if not cfg.get(c["id"], {}).get("mic", False):
+                        self.linked_card_hw = None
+                        print("webcam mic disabled - link rejected:", c["label"])
+                    break
         self.mix_linked = self._w_mix_cb.get_active()
         try:
             self.sample_rate = int(self._w_rate_combo.get_active_text())

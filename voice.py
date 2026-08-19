@@ -93,7 +93,8 @@ AI_SYSTEM = ("You are Lino, a friendly, helpful AI assistant running "
              "unless he wants depth. Offer advice, practical suggestions, and "
              "ask a light follow-up now and then. You can control the computer using "
              "the provided tools (open_app, click, type_text, press_key, scroll, "
-             "volume, open_chat, look_at_screen). Use a tool whenever the user asks "
+             "volume, open_chat, look_at_screen, camera_pan_tilt, camera_see, "
+             "camera_track, camera_watch). Use a tool whenever the user asks "
              "for an action; then say in one short sentence what you did. If it is a "
              "normal question or they just want to chat, answer plainly with no "
              "tool call.")
@@ -132,6 +133,24 @@ TOOLS = [
         "description": "Take a screenshot and describe what is currently on the screen. Use when the user asks what you see, what's on the screen, or needs help finding something visible.",
         "parameters": {"type": "object", "properties": {
             "question": {"type": "string", "description": "Optional question about the screen contents"}}}}},
+    {"type": "function", "function": {"name": "camera_pan_tilt",
+        "description": "Move the OBSBOT camera gimbal: pan (left/right) and tilt (up/down) in degrees, or zoom in/out.",
+        "parameters": {"type": "object", "properties": {
+            "pan": {"type": "integer", "description": "Pan degrees, negative = left, positive = right"},
+            "tilt": {"type": "integer", "description": "Tilt degrees, negative = down, positive = up"},
+            "zoom": {"type": "integer", "description": "Zoom 0-100"}}}}},
+    {"type": "function", "function": {"name": "camera_see",
+        "description": "Look through the webcam and describe what the camera sees (people, faces, objects).",
+        "parameters": {"type": "object", "properties": {
+            "question": {"type": "string", "description": "Optional question about the camera view"}}}}},
+    {"type": "function", "function": {"name": "camera_track",
+        "description": "Turn AI person tracking on or off on the OBSBOT camera.",
+        "parameters": {"type": "object", "properties": {
+            "on": {"type": "boolean", "description": "True to track a person, False to stop"}}}}},
+    {"type": "function", "function": {"name": "camera_watch",
+        "description": "Start or stop watching the webcam for a person's face. When a face is seen, Lino stops watching and greets them.",
+        "parameters": {"type": "object", "properties": {
+            "start": {"type": "boolean", "description": "True to start watching, False to stop"}}}}},
     {"type": "function", "function": {"name": "open_chat",
         "description": "Open the Lino chat window.",
         "parameters": {"type": "object", "properties": {}}}},
@@ -476,12 +495,14 @@ _panel_geometry.cache = None
 _panel_geometry.last = 0.0
 
 
-def _input_source():
+def _input_source(prefer=None):
     """Best capture source for arecord -D pulse, or None for default.
 
     Prefers real microphones (never the silent loopback monitors) and ranks
     them by quality: Bluetooth headset first (that's where you talk), then
     USB/quality mics, highest sample rate wins within each tier.
+    `prefer` is a substring that, if found, wins over everything (e.g. the
+    OBSBOT webcam mic when the camera watcher is active).
     """
     import re as _re
     try:
@@ -504,6 +525,10 @@ def _input_source():
         entries.append((name, rate))
     if not entries:
         return None
+    if prefer:
+        for e in entries:
+            if prefer in e[0]:
+                return e[0]
     usb = sorted([e for e in entries if "usb" in e[0]], key=lambda e: e[1], reverse=True)
     bluez = sorted([e for e in entries if "bluez" in e[0]], key=lambda e: e[1], reverse=True)
     pool = bluez or usb or entries
@@ -989,6 +1014,10 @@ class LinoVoice(Gtk.Window):
         self.chat_history = []
         self.ai_mode = "smart"
         self.ai_model = AI_MODEL
+        self.camera_ai_on = False
+        self.camera_watching = False
+        self.camera_mic = None
+        self._cam = None
 
         self.connect("draw", self._draw_transparent_bg)
         self.connect("button-press-event", self._on_bubble_click)
@@ -1356,6 +1385,17 @@ class LinoVoice(Gtk.Window):
         vrow.pack_start(vcombo, True, True, 0)
         box.pack_start(vrow, False, False, 0)
 
+        crow = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        clab = Gtk.Label(label="Camera AI (face/OCR):")
+        clab.set_name("status")
+        csw = Gtk.Switch()
+        csw.set_active(bool(self.camera_ai_on))
+        csw.set_tooltip_text("Let Lino use the webcam for face recognition and text (OCR) — offline, no internet")
+        csw.connect("notify::active", lambda sw, _p: setattr(self, "camera_ai_on", sw.get_active()))
+        crow.pack_start(clab, False, False, 0)
+        crow.pack_start(csw, False, False, 0)
+        box.pack_start(crow, False, False, 0)
+
         dlg.add_button("Close", Gtk.ResponseType.CLOSE)
 
         def append(role, text):
@@ -1478,7 +1518,8 @@ class LinoVoice(Gtk.Window):
             except OSError:
                 pass
         cmd = ["arecord", "-f", "S16_LE", "-r", "16000", "-c", "1", "-t", "raw"]
-        src = _input_source()
+        prefer = getattr(self, "camera_mic", None)
+        src = _input_source(prefer=prefer)
         env = os.environ
         if src:
             cmd[1:1] = ["-D", "pulse"]
@@ -1798,6 +1839,278 @@ class LinoVoice(Gtk.Window):
             return "Right now you have open: " + "; ".join(wins) + "."
         return "I saw the screen but could not describe it."
 
+    def _camera(self):
+        """Return the first available OBSBOT camera object, or None."""
+        if self._cam is None:
+            try:
+                from obsbot_control import Obsbot
+                self._cam = Obsbot.find()
+            except Exception:
+                self._cam = None
+        return self._cam
+
+    def _handle_camera_cmd(self, t, text):
+        """Parse camera voice commands and run them on the OBSBOT."""
+        import re as _re
+        cam = self._camera()
+        if cam is None:
+            self.status.set_text("📷 no camera found")
+            run_tts_async("I couldn't find an OBSBOT camera.")
+            return True
+
+        def _run(fn, *a, **kw):
+            try:
+                fn(*a, **kw)
+                return True
+            except Exception:
+                return False
+
+        # wake / sleep
+        if _has(t, "wake", "wake up") and _has(t, "camera", "cam", "obsbot"):
+            ok = _run(cam.wake)
+            msg = "Waking up the camera." if ok else "Camera didn't wake."
+            self.status.set_text("📷 " + msg); run_tts_async(msg); return True
+        if _has(t, "sleep", "go to sleep") and _has(t, "camera", "cam", "obsbot"):
+            ok = _run(cam.sleep)
+            msg = "Camera is going to sleep." if ok else "Camera wouldn't sleep."
+            self.status.set_text("📷 " + msg); run_tts_async(msg); return True
+
+        # recenter
+        if _has(t, "recenter", "center the camera", "center camera", "look straight"):
+            ok = _run(cam.recenter)
+            msg = "Camera centered." if ok else "Couldn't center the camera."
+            self.status.set_text("📷 " + msg); run_tts_async(msg); return True
+
+        # zoom
+        m = _re.search(r"zoom\s*(in|out)?\s*(up|down)?\s*(\d+)?", t)
+        if m and _has(t, "zoom"):
+            if m.group(3):
+                val = int(m.group(3))
+                ok = _run(cam.set_gimbal_speed, zoom_pct=val)
+                msg = "Zoom set to " + str(val) + "." if ok else "Zoom failed."
+            elif m.group(1) == "in" or m.group(2) == "up":
+                ok = _run(cam.set_gimbal_speed, zoom_pct=90)
+                msg = "Zooming in." if ok else "Zoom failed."
+            elif m.group(1) == "out" or m.group(2) == "down":
+                ok = _run(cam.set_gimbal_speed, zoom_pct=10)
+                msg = "Zooming out." if ok else "Zoom failed."
+            else:
+                ok = _run(cam.set_gimbal_speed, zoom_pct=50)
+                msg = "Zoom reset." if ok else "Zoom failed."
+            self.status.set_text("📷 " + msg); run_tts_async(msg); return True
+
+        # pan / tilt with degrees
+        m = _re.search(r"(pan|tilt)\s*(left|right|up|down)?\s*(\d+)?", t)
+        if m:
+            axis, direction, num = m.group(1), m.group(2), m.group(3)
+            if axis == "pan":
+                if direction == "left":
+                    deg = -(int(num) if num else 20)
+                elif direction == "right":
+                    deg = int(num) if num else 20
+                else:
+                    deg = 0
+                ok = _run(cam.set_gimbal_speed, yaw=deg)
+                msg = "Panning " + (direction or "center") + "." if ok else "Pan failed."
+            else:
+                if direction == "down":
+                    deg = -(int(num) if num else 20)
+                elif direction == "up":
+                    deg = int(num) if num else 20
+                else:
+                    deg = 0
+                ok = _run(cam.set_gimbal_speed, pitch=deg)
+                msg = "Tilting " + (direction or "center") + "." if ok else "Tilt failed."
+            self.status.set_text("📷 " + msg); run_tts_async(msg); return True
+
+        # ai tracking
+        if _has(t, "track", "follow") and _has(t, "me", "person", "face"):
+            ok = _run(cam.set_ai_mode, "person")
+            msg = "Tracking you now." if ok else "Tracking failed."
+            self.status.set_text("📷 " + msg); run_tts_async(msg); return True
+        if _has(t, "stop") and _has(t, "tracking", "follow"):
+            ok = _run(cam.set_ai_mode, "none")
+            msg = "Stopped tracking." if ok else "Couldn't stop tracking."
+            self.status.set_text("📷 " + msg); run_tts_async(msg); return True
+
+        # watch for someone (scans camera + uses the OBSBOT mic)
+        if _has(t, "watch", "scan") and _has(t, "camera", "for someone", "for anyone", "watching"):
+            if not self.camera_watching:
+                self.start_camera_watch()
+            else:
+                self.status.set_text("📷 already watching")
+            return True
+        if _has(t, "stop watching", "stop scanning", "stop watch"):
+            if self.camera_watching:
+                self.stop_camera_watch()
+            else:
+                self.status.set_text("📷 not watching")
+            return True
+
+        # see me / face recognition / ocr (requires the Camera AI switch on)
+        if (_has(t, "see me", "look at me", "see the camera", "who's there", "whos there",
+                 "who is there", "face", "recognize", "ocr", "read the text",
+                 "read what it says", "what does it say")
+                or (t.startswith("look") and _has(t, "camera"))):
+            if not self.camera_ai_on:
+                msg = "Camera AI is off. Turn on Camera AI in the chat window first."
+                self.heard_label.set_text("👁 " + msg)
+                self.status.set_text("👁 camera AI off")
+                run_tts_async("Camera AI is off. Turn it on in the chat window first.")
+                return True
+            q = re.sub(r"^(look at me|see me|who's? there|look at the camera|"
+                       r"look through the camera|recognize me|who am i|who is this|"
+                       r"read the text|what does it say|ocr)"
+                       r"[ ,:.]*", "", text, flags=re.IGNORECASE).strip()
+
+            def _see_done(res):
+                self.heard_label.set_text("👁 " + res)
+                self.status.set_text("👁 camera read")
+                run_tts_async(res)
+            if _has(t, "ocr", "read the text", "read what it says", "what does it say"):
+                def _ocr_done(res):
+                    self.heard_label.set_text("👁 " + res)
+                    self.status.set_text("👁 OCR done")
+                    run_tts_async(res)
+                threading.Thread(target=lambda: GLib.idle_add(
+                    _ocr_done, self._cam_ocr()), daemon=True).start()
+                self.status.set_text("👁 reading text...")
+                return True
+            if _has(t, "face", "recognize") and not q:
+                def _faces_done(res):
+                    self.heard_label.set_text("👁 " + res)
+                    self.status.set_text("👁 faces read")
+                    run_tts_async(res)
+                threading.Thread(target=lambda: GLib.idle_add(
+                    _faces_done, self._cam_faces()), daemon=True).start()
+                self.status.set_text("👁 looking for faces...")
+                return True
+            threading.Thread(target=lambda: GLib.idle_add(
+                _see_done, self._cam_see(q)), daemon=True).start()
+            self.status.set_text("👁 looking through the camera...")
+            return True
+
+        # status
+        if _has(t, "status", "how are you camera", "camera status", "camera on"):
+            st = cam.status()
+            self.status.set_text("📷 camera status")
+            run_tts_async("The camera is ready.")
+            return True
+
+        return False
+
+    def _camera_watcher(self):
+        """Reuse the FaceWatcher component from the camera project."""
+        if self._watcher is None:
+            try:
+                from media_control import FaceWatcher
+                self._watcher = FaceWatcher(device="/dev/video2")
+            except Exception:
+                self._watcher = None
+        return self._watcher
+
+    def _cam_see(self, question=""):
+        """Capture a webcam frame and ask the vision AI what it sees."""
+        w = self._camera_watcher()
+        if w is None:
+            return "Camera support is not available."
+        b64 = w.grab_b64()
+        if not b64:
+            return "I could not get a picture from the camera."
+        q = question or "Look at the camera view. Describe what you see, including any people and their faces, briefly."
+        msgs = [{"role": "system", "content": AI_SYSTEM},
+                {"role": "user", "content": q}]
+        reply = ai_chat(msgs, model=VISION_MODEL, timeout=120, images=[b64])
+        return reply or "I got a picture but couldn't describe it."
+
+    def _cam_faces(self):
+        """Detect faces via the FaceWatcher component."""
+        w = self._camera_watcher()
+        if w is None:
+            return "Camera support is not available."
+        try:
+            import cv2  # noqa
+        except ImportError:
+            return "Face detection is not installed (opencv)."
+        w.check()
+        n = w.face_count
+        if n == 0:
+            return "I don't see any faces right now."
+        return "I see " + ("one face." if n == 1 else "%d faces." % n)
+
+    def _cam_ocr(self):
+        """Read text from the webcam frame (offline, tesseract)."""
+        w = self._camera_watcher()
+        if w is None:
+            return "Camera support is not available."
+        txt = w.ocr()
+        if not txt:
+            return "I don't see any text in the camera view."
+        return "I read: " + txt[:400]
+
+    def _screen_see(self, question=""):
+        """Vision on the whole screen (screenshot + AI description)."""
+        b64 = _screenshot_b64()
+        if not b64:
+            return "I could not capture the screen."
+        q = question or "Describe what is on the screen right now, briefly."
+        msgs = [{"role": "system", "content": AI_SYSTEM},
+                {"role": "user", "content": q}]
+        reply = ai_chat(msgs, model=VISION_MODEL, timeout=120, images=[b64])
+        return reply or "I saw the screen but could not describe it."
+
+    def start_camera_watch(self):
+        """Watch the webcam for someone. Uses the OBSBOT mic so Lino can
+        hear and talk to whoever is in front of the camera."""
+        self.camera_watching = True
+        self.camera_mic = "OBSBOT"
+        self.status.set_text("📷 watching for someone...")
+        run_tts_async("I'm watching. Say something when you're ready.")
+        self._watch_last_greet = 0.0
+        GLib.timeout_add(4000, self._camera_watch_tick)
+
+    def stop_camera_watch(self):
+        self.camera_watching = False
+        self.camera_mic = None
+        w = self._camera_watcher()
+        if w is not None:
+            try:
+                w.stop()
+            except Exception:
+                pass
+        self.status.set_text("📷 camera watch stopped")
+        run_tts_async("Stopped watching.")
+        return False
+
+    def _camera_watch_tick(self):
+        if not self.camera_watching:
+            return False
+        w = self._camera_watcher()
+        if w is not None:
+            try:
+                if w.check():
+                    now = _time.time()
+                    if now - self._watch_last_greet > 20.0:
+                        self._watch_last_greet = now
+                        GLib.idle_add(self._watch_greet)
+            except Exception:
+                pass
+        return True
+
+    def _watch_greet(self):
+        self.camera_watching = False
+        self.camera_mic = None
+        self.status.set_text("👋 welcome back!")
+        run_tts_async("Welcome back! I'll stop watching now.")
+        w = self._camera_watcher()
+        if w is not None:
+            try:
+                w.stop()
+            except Exception:
+                pass
+        if not self.listening:
+            self.start_listen()
+
     def _run_tool(self, name, args):
         """Execute a native Ollama tool call; narrate and return the result."""
         try:
@@ -1868,6 +2181,39 @@ class LinoVoice(Gtk.Window):
                 desc = self._describe_screen(args.get("question", ""))
                 self.status.set_text("👁 screen: " + desc[:60])
                 return "screen contents: " + desc
+            if name == "camera_pan_tilt":
+                cam = self._camera()
+                if cam is None:
+                    return "error: no camera found"
+                pan = args.get("pan", 0)
+                tilt = args.get("tilt", 0)
+                zoom = args.get("zoom", None)
+                if zoom is not None:
+                    cam.set_gimbal_speed(zoom_pct=int(zoom))
+                if pan or tilt:
+                    cam.set_gimbal_speed(yaw=int(pan), pitch=int(tilt))
+                self.status.set_text("📷 camera moved")
+                return "camera moved"
+            if name == "camera_see":
+                desc = self._cam_see(args.get("question", ""))
+                self.status.set_text("📷 see: " + desc[:60])
+                return "camera view: " + desc
+            if name == "camera_track":
+                cam = self._camera()
+                if cam is None:
+                    return "error: no camera found"
+                cam.set_ai_mode("person" if args.get("on") else "none")
+                self.status.set_text("📷 tracking on" if args.get("on") else "📷 tracking off")
+                return "tracking " + ("on" if args.get("on") else "off")
+            if name == "camera_watch":
+                if args.get("start"):
+                    if not self.camera_watching:
+                        self.start_camera_watch()
+                    return "watching for a person's face"
+                else:
+                    if self.camera_watching:
+                        self.stop_camera_watch()
+                    return "stopped watching"
             if name == "open_chat":
                 GLib.idle_add(self.on_chat, None)
                 self.status.set_text("💬 opening chat")
@@ -1953,6 +2299,10 @@ class LinoVoice(Gtk.Window):
                 _done, self._describe_screen(q)), daemon=True).start()
             self.status.set_text("👁 looking at the screen...")
             return True
+        # ---- obsbot camera control (pan/tilt/zoom/tracking) ----
+        if _has(t, "camera", "cam", "obsbot"):
+            if self._handle_camera_cmd(t, text):
+                return True
         # ---- mouse clicks (specific before generic) ----
         if "right click" in t:
             mouse_click(3); self.status.set_text("🖱 right-click"); run_tts_async("Right click."); return True

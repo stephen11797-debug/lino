@@ -15,6 +15,7 @@ import os
 import sys
 import threading
 import time
+import base64
 
 import gi
 
@@ -90,7 +91,6 @@ class CameraManager:
     def __init__(self):
         self.by_bus = {}
         self.kinds = {}
-
     def refresh(self):
         found = []
         seen = set()
@@ -125,6 +125,113 @@ class CameraManager:
     def devnode(self, bus):
         cam = self.by_bus.get(bus)
         return cam.devnode if cam else None
+
+
+class FaceWatcher:
+    """Watches a webcam for a person/face. Reuses the GStreamer capture
+    pipeline (same as Preview) and detects faces with OpenCV. Call
+    `check()` periodically from a GLib timeout; it returns True when a
+    face appears. Keeps the latest frame as a base64 PNG for OCR/vision."""
+
+    def __init__(self, device="/dev/video0"):
+        self.device = device
+        self.pipe = None
+        self.sink = None
+        self.last_frame_b64 = None
+        self.face_count = 0
+        self._faces_seen = False
+
+    def _start(self):
+        if self.pipe is not None:
+            return
+        Gst.init(None)
+        desc = ("v4l2src device=%s ! videoscale ! video/x-raw,width=640,height=360 ! "
+                "videoconvert ! video/x-raw,format=RGB ! appsink "
+                "max-buffers=1 drop=true sync=false" % self.device)
+        self.pipe = Gst.parse_launch(desc)
+        self.sink = self.pipe.get_by_name("sink")
+        self.pipe.set_state(Gst.State.PLAYING)
+
+    def stop(self):
+        if self.pipe is not None:
+            self.pipe.set_state(Gst.State.NULL)
+            self.pipe = None
+            self.sink = None
+        self._faces_seen = False
+
+    def _frame_b64(self):
+        self._start()
+        time.sleep(0.3)
+        sample = self.sink.props.last_sample
+        if sample is None:
+            return None
+        import base64
+        buf = sample.get_buffer()
+        caps = sample.get_caps()
+        s = caps.get_structure(0)
+        ok, w = s.get_int("width")
+        ok, h = s.get_int("height")
+        size = buf.get_size()
+        if not (w and h and size >= w * h * 3):
+            return None
+        pb = GdkPixbuf.Pixbuf.new_from_bytes(
+            GLib.Bytes.new(buf.extract_dup(0, size)),
+            GdkPixbuf.Colorspace.RGB, False, 8, w, h, w * 3)
+        png = pb.save_to_bufferv("png", [], [])
+        self.last_frame_b64 = base64.b64encode(png[0]).decode("ascii")
+        return self.last_frame_b64
+
+    def grab_b64(self):
+        """Return the latest frame as base64 PNG (or None)."""
+        return self._frame_b64()
+
+    def check(self):
+        """Scan for a face. Returns True if at least one face is visible."""
+        try:
+            import cv2
+            import numpy as np
+            b64 = self._frame_b64()
+            if not b64:
+                self.face_count = 0
+                return False
+            raw = np.frombuffer(base64.b64decode(b64), np.uint8)
+            img = cv2.imdecode(raw, cv2.IMREAD_COLOR)
+            if img is None:
+                self.face_count = 0
+                return False
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            cascade = cv2.CascadeClassifier(
+                cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+            faces = cascade.detectMultiScale(gray, 1.1, 5)
+            self.face_count = len(faces)
+            self._faces_seen = self.face_count > 0
+            return self._faces_seen
+        except Exception:
+            self.face_count = 0
+            return False
+
+    def ocr(self):
+        """Read text from the latest frame with tesseract (offline)."""
+        import base64
+        b64 = self._frame_b64()
+        if not b64:
+            return None
+        import subprocess, tempfile, os
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            f.write(base64.b64decode(b64))
+            tmp = f.name
+        try:
+            p = subprocess.run(["tesseract", tmp, "-", "--psm", "3"],
+                               capture_output=True, text=True, timeout=30)
+            txt = p.stdout.strip()
+            return txt or None
+        except Exception:
+            return None
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
 
 
 class Preview:

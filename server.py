@@ -25,6 +25,7 @@ PORT = 8000
 messages = []          # list of {"type": "user"|"ai", "text": str}
 rev = 0                # monotonic message revision
 cond = threading.Condition()
+last_sync = None       # when the public repo was last synced from private
 
 
 def find_html():
@@ -117,6 +118,12 @@ class Handler(BaseHTTPRequestHandler):
         with cond:
             self.send_json({"rev": rev, "ok": True})
 
+    def api_sync(self):
+        global last_sync
+        last_sync = {"time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                     "note": "public repo updated"}
+        self.send_json({"ok": True, "last_sync": last_sync})
+
     def do_GET(self):
         path = urlparse(self.path).path
         if path in ("/", "/index.html"):
@@ -125,6 +132,8 @@ class Handler(BaseHTTPRequestHandler):
             self.api_state()
         elif path == "/api/poll":
             self.api_poll()
+        elif path == "/api/sync":
+            self.send_json({"last_sync": last_sync})
         else:
             self.send_json({"error": "not found"}, 404)
 
@@ -132,6 +141,8 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/api/send":
             self.api_send()
+        elif path == "/api/sync":
+            self.api_sync()
         else:
             self.send_json({"error": "not found"}, 404)
 
